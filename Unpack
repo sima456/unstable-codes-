@@ -1,0 +1,52 @@
+import argparse
+import pySRDF
+import os
+import logging
+from tqdm import tqdm
+
+def unpack_exe(file_name: str, output_file: str, log_file: str = None, verbose: bool = False):
+    try:
+        if not os.path.isfile(file_name):
+            raise ValueError(f"{file_name} is not a valid file.")
+
+        if not file_name.endswith(".exe"):
+            raise ValueError(f"{file_name} is not an executable file.")
+
+        emu = pySRDF.Emulator(file_name)
+        emu.SetBp("isdirty(eip)")
+
+        if verbose:
+            print("Starting emulation...")
+
+        if log_file:
+            emu.Run(log_file)
+        else:
+            emu.Run()
+
+        if verbose:
+            print("Emulation complete. Dumping new file...")
+
+        emu.Dump(output_file, pySRDF.DUMP_FIXIMPORTTABLE)
+
+        if verbose:
+            print("File Unpacked Successfully\n\nThe Disassembled Code\n---------------")
+
+    except ValueError as ve:
+        print(ve)
+    except Exception as e:
+        print("An error occurred:", e)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Unpack a packed exe file')
+    parser.add_argument('file', metavar='file', type=str, help='file name of exe file')
+    parser.add_argument('-o', '--output', type=str, help='output file name')
+    parser.add_argument('-l', '--log', type=str, help='log file name')
+    parser.add_argument('-v', '--verbose', action='store_true', help='verbose mode')
+    args = parser.parse_args()
+
+    if args.output is None:
+        output_file = args.file.replace(".exe", "_unpacked.exe")
+    else:
+        output_file = args.output
+
+    unpack_exe(args.file, output_file, args.log, args.verbose)
