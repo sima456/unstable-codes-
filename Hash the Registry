@@ -1,0 +1,36 @@
+import hashlib
+import winreg
+
+def print_alert(key, value):
+    print(f"ALERT: Registry key {key} has been changed, new value is {value}")
+
+def hash_key(key):
+    hash = hashlib.sha256()
+    try:
+        i = 0
+        while True:
+            value = winreg.EnumValue(key, i)
+            hash.update(str(value).encode('utf-8'))
+            i += 1
+    except OSError:
+        return hash.hexdigest()
+
+def monitor_registry():
+    run_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_NOTIFY)
+    runonce_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\RunOnce", 0, winreg.KEY_NOTIFY)
+
+    while True:
+        winreg.NotifyChangeKeyValue(run_key, False, winreg.REG_NOTIFY_CHANGE_NAME | winreg.REG_NOTIFY_CHANGE_LAST_SET)
+        winreg.NotifyChangeKeyValue(runonce_key, False, winreg.REG_NOTIFY_CHANGE_NAME | winreg.REG_NOTIFY_CHANGE_LAST_SET)
+        run_hash = hash_key(run_key)
+        runonce_hash = hash_key(runonce_key)
+        if run_hash != run_prev_hash:
+            print_alert("Run", run_hash)
+            run_prev_hash = run_hash
+        if runonce_hash != runonce_prev_hash:
+            print_alert("RunOnce", runonce_hash)
+            runonce_prev_hash = runonce_hash
+
+run_prev_hash = hash_key(winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run"))
+runonce_prev_hash = hash_key(winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\RunOnce"))
+monitor_registry()
