@@ -1,0 +1,58 @@
+from bokeh.plotting import figure
+from bokeh.io import output_file, show
+from bokeh.models import Plot, Range1d, MultiLine, Circle, HoverTool, TapTool, BoxSelectTool
+from bokeh.models.graphs import from_networkx
+from bokeh.embed import server_document
+from flask import Flask, render_template
+import networkx as nx
+import pyshark
+
+app = Flask(__name__)
+
+def analyze_pcap(pcap_file):
+    # Create a blank graph
+    G = nx.Graph()
+
+    # Read in the PCAP file using pyshark
+    capture = pyshark.FileCapture(pcap_file)
+
+    # Iterate through the packets in the PCAP file
+    for packet in capture:
+        # Get the source and destination IP addresses
+        src_ip = packet.ip.src
+        dst_ip = packet.ip.dst
+
+        # Add an edge between the source and destination IPs to the graph
+        G.add_edge(src_ip, dst_ip)
+
+    # Return the graph
+    return G
+
+@app.route('/')
+def plot():
+    # Load the data from a PCAP file
+    G = analyze_pcap('malware_traffic')
+
+    # Set the node color based on the group attribute (since this is not available in the PCAP file, we can set all nodes to the same color)
+    node_colors = ['r' for _ in range(len(G.nodes()))]
+
+    # Create the Bokeh plot
+    plot = Plot(plot_width=400, plot_height=400, x_range=Range1d(-1.1,1.1), y_range=Range1d(-1.1,1.1))
+
+    # Convert the NetworkX graph to a Bokeh graph
+    bokeh_graph = from_networkx(G, nx.circular_layout, scale=1, center=(0,0))
+
+    # Add hover and tap tools
+    hover_tool = HoverTool(tooltips=[("IP", "@index")])
+    tap_tool = TapTool()
+    plot.add_tools(hover_tool, tap_tool)
+
+    # Add the Bokeh graph to the plot
+    plot.add_glyph(bokeh_graph)
+
+    # Render the plot and return it as an HTML string
+    script, div = components(plot)
+    return render_template('graph.html', script=script, div=div)
+
+if __name__ == '__main__':
+    app.run(port=8080)
